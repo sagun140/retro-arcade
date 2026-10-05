@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Arcade 95</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 16 16%27 shape-rendering=%27crispEdges%27%3E%3Crect x=%272%27 y=%279%27 width=%2712%27 height=%275%27 fill=%27%23444%27/%3E%3Crect x=%277%27 y=%274%27 width=%272%27 height=%276%27 fill=%27%23222%27/%3E%3Crect x=%275%27 y=%271%27 width=%276%27 height=%275%27 fill=%27%23e33%27/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Silkscreen&display=swap">
@@ -20,7 +21,7 @@
 <div class="taskbar">
   <button class="start bevel-out" id="start" aria-expanded="false"><svg viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="2" y="5" width="12" height="7" fill="#444"/><rect x="3" y="6" width="10" height="5" fill="#777"/><rect x="5" y="2" width="1" height="4" fill="#222"/><rect x="4" y="1" width="3" height="2" fill="#e33"/><rect x="10" y="7" width="2" height="2" fill="#ffd23f"/></svg>Start</button>
   <div class="tasks" id="tasks"></div>
-  <div class="tray"><button id="b-vol" aria-label="Toggle sound">🔊</button><span id="clock">12:00 PM</span></div>
+  <div class="tray"><button id="b-flip" aria-label="Flip 3D: see all windows in 3D" title="Flip 3D (Ctrl+Shift+F)">▦</button><button id="b-vol" aria-label="Toggle sound">🔊</button><span id="clock">12:00 PM</span></div>
 </div>
 
 <div class="shutdown" id="shutdown" hidden><div>It's now safe to turn off<br>your computer.<small>Click anywhere to boot back up</small></div></div>
@@ -37,6 +38,16 @@
 <script src="js/snake.js"></script>
 <script src="js/amp.js"></script>
 <script src="js/cdplayer.js"></script>
+<script src="js/emulator.js"></script>
+<script src="js/explorer.js"></script>
+<script src="js/dxdiag.js"></script>
+<script src="js/screensaver.js"></script>
+<script src="js/paint.js"></script>
+<script src="js/notepad.js"></script>
+<script src="js/calc.js"></script>
+<script src="js/defrag.js"></script>
+<script src="js/dos.js"></script>
+<script src="js/boot.js"></script>
 <script src="js/system.js"></script>
 <script>Arcade.boot('byterush');</script>
 </body>

@@ -73,3 +73,27 @@ Shared helpers on `window.Arcade`:
 | `Arcade.coarse` | true on touch devices; provide touch controls when it is |
 
 Rules: no external assets or network calls (draw everything with canvas/CSS/SVG, synthesize sound with WebAudio), no globals besides your `Arcade.app` call, and everything must work at phone width.
+Exceptions by design: `emulator.js` loads the v86 emulator from jsDelivr and disk images from `emu/`; `explorer.js` frames web.archive.org and sites that allow framing.
+
+## Programs
+
+Games: Byte Rush, Minesweeper, Solitaire, FreeCell, Ski Slope, Hover!, Space Pinball, Snake 98.
+Accessories: Amp 95, CD Player, PC Emulator (v86: KolibriOS, FreeDOS, bring-your-own image), Arcade Explorer (Wayback time machine browser), DxDiag (real hardware readout + DirectX-style tests), Paint, Notepad, Calculator, Disk Defragmenter, ScanDisk, MS-DOS Prompt, Display Properties (theme packs, wallpapers, schemes, screen savers).
+System: boot sequence (`js/boot.js`), Shut Down dialog, Ctrl+Alt+Del / Ctrl+Alt+Backspace Close Program + blue screen, screen savers (`js/screensaver.js`, `window.Screensavers95`), Flip 3D (tray ▦ button or Ctrl+Shift+F).
+
+Licenses for bundled emulator files: `emu/LICENSES.md`. No Microsoft software is included.
+
+Shared globals besides `Arcade`: `Cards95` (cards.js), `Tracks95` (amp.js), `Screensavers95` (screensaver.js).
+Store keys used across programs: `theme`, `paint.wallpaper`, `screensaver.name|wait|password`, `boot.full`, `boot.forceInTests` (tests only; boot is skipped under webdriver), `user.name`, `dos.fs`.
+`Arcade.apps.dos.console(host, opts)` creates a DOS console (used by MS-DOS mode). `Arcade.idleInhibit` (value or function) stops the screen saver from auto-starting.
+
+### Shell hooks (for system-level programs)
+
+| helper | meaning |
+|---|---|
+| `Arcade.hooks.shutdown = fn` | replaces what Start ▸ Shut Down… does (default: `Arcade.safeToTurnOff()`) |
+| `Arcade.safeToTurnOff()` | shows the "It's now safe to turn off your computer" screen |
+| `Arcade.openWindows()` | `[{id, title, ctx}]` for every open window (for Close Program / End Task) |
+| `Arcade.activeId()`, `Arcade.blurAll()`, `Arcade.closeStart()` | focus helpers |
+
+Testing: `node tools/smoke.mjs <id> out.png --eval "<js>"`. Dispatch synthetic keys on `document.body` (bubbling) or `window`.

@@ -117,11 +117,17 @@
     }) }
   };
   const wpCache = {};
-  function wallpaperURL(name) { const wp = WALLPAPERS[name]; if (!wp) return null; return wpCache[name] || (wpCache[name] = wp.make()); }
+  // '(Paint)' is a picture saved from Paint: {url, mode: 'tiled' | 'centered'}
+  function paintWp() { const pw = store.get('paint.wallpaper', null); return pw && pw.url ? { cover: pw.mode !== 'tiled', tile: 'auto', url: pw.url, centered: pw.mode !== 'tiled' } : null; }
+  const wpInfo = name => (name === '(Paint)' ? paintWp() : WALLPAPERS[name]);
+  const wallpaperNames = () => Object.keys(WALLPAPERS).concat(paintWp() ? ['(Paint)'] : []);
+  function wallpaperURL(name) { if (name === '(Paint)') { const p = paintWp(); return p && p.url; } const wp = WALLPAPERS[name]; if (!wp) return null; return wpCache[name] || (wpCache[name] = wp.make()); }
   function applyWallpaper(name) {
-    const r = document.documentElement.style, wp = WALLPAPERS[name], url = wallpaperURL(name);
+    const r = document.documentElement.style, wp = wpInfo(name), url = wallpaperURL(name);
     if (!url) { r.setProperty('--wallpaper', 'none'); r.setProperty('--wallpaper-size', 'auto'); return; }
-    r.setProperty('--wallpaper', `url(${url})`); r.setProperty('--wallpaper-size', wp.cover ? 'cover' : wp.tile);
+    r.setProperty('--wallpaper', `url(${url})`);
+    r.setProperty('--wallpaper-size', wp.centered ? 'auto' : wp.cover ? 'cover' : wp.tile);
+    r.setProperty('--wallpaper-repeat', wp.centered ? 'no-repeat' : 'repeat');
   }
 
   /* ================= Theme packs ================= */
@@ -179,24 +185,25 @@
       const names = Object.keys(PACKS), name = names[Math.floor(t / 1.6) % names.length], p = PACKS[name], s = SCHEMES[p.scheme];
       g.fillStyle = s.desk; g.fillRect(0, 0, w, h);
       const url = wallpaperURL(p.wallpaper);
-      if (url) { const img = previewImgs[url] || (previewImgs[url] = Object.assign(new Image(), { src: url })); if (img.complete) { const wp = WALLPAPERS[p.wallpaper]; if (wp.cover) g.drawImage(img, 0, 0, w, h); else { const pat = g.createPattern(img, 'repeat'); g.fillStyle = pat; g.fillRect(0, 0, w, h); } } }
+      if (url) { const img = previewImgs[url] || (previewImgs[url] = Object.assign(new Image(), { src: url })); if (img.complete) { const wp = wpInfo(p.wallpaper); if (wp.cover) g.drawImage(img, 0, 0, w, h); else { const pat = g.createPattern(img, 'repeat'); g.fillStyle = pat; g.fillRect(0, 0, w, h); } } }
       g.fillStyle = s.face; g.fillRect(40, 26, 128, 66);
       const tg = g.createLinearGradient(42, 0, 166, 0); tg.addColorStop(0, s.title1); tg.addColorStop(1, s.title2); g.fillStyle = tg; g.fillRect(42, 28, 124, 11);
       g.fillStyle = s.titleInk; g.font = 'bold 8px Tahoma, sans-serif'; g.fillText(name, 45, 37);
       g.fillStyle = s.window; g.fillRect(46, 44, 116, 42);
     },
     build(ctx) {
-      let draft = { ...theme }, tab = 'Theme Packs';
+      const saverDraft = () => ({ saver: store.get('screensaver.name', 'Starfield Simulation'), wait: store.get('screensaver.wait', 3), password: store.get('screensaver.password', '') });
+      let draft = { ...theme, ...saverDraft() }, tab = 'Theme Packs';
       ctx.body.innerHTML = `<div class="dp-tabs" role="tablist"></div><div class="dp-page"></div>
         <div class="dp-actions"><button class="btn" data-a="ok">OK</button><button class="btn" data-a="cancel">Cancel</button><button class="btn" data-a="apply">Apply</button></div>`;
       const tabsEl = ctx.body.querySelector('.dp-tabs'), page = ctx.body.querySelector('.dp-page');
-      ['Theme Packs', 'Background', 'Appearance'].forEach(n => {
+      ['Theme Packs', 'Background', 'Screen Saver', 'Appearance'].forEach(n => {
         const b = el('<button role="tab"></button>'); b.textContent = n;
         b.onclick = () => { tab = n; render(); }; tabsEl.appendChild(b);
       });
       const monitor = () => {
-        const s = SCHEMES[draft.scheme], url = wallpaperURL(draft.wallpaper), wp = WALLPAPERS[draft.wallpaper];
-        return `<div class="dp-monitor"><div class="dp-screen" style="--pv-desk:${s.desk};${url ? `background-image:url(${url});background-size:${wp.cover ? 'cover' : wp.tile.split(' ').map(v => parseInt(v) / 4 + 'px').join(' ')}` : ''}">
+        const s = SCHEMES[draft.scheme], url = wallpaperURL(draft.wallpaper), wp = wpInfo(draft.wallpaper);
+        return `<div class="dp-monitor"><div class="dp-screen" style="--pv-desk:${s.desk};${url ? `background-image:url(${url});background-size:${wp.centered ? 'contain' : wp.cover ? 'cover' : wp.tile.split(' ').map(v => parseInt(v) / 4 + 'px').join(' ')};background-repeat:${wp.centered ? 'no-repeat' : 'repeat'};background-position:center` : ''}">
           <div class="dp-mini" style="background:${s.face};box-shadow:inset -1px -1px ${s.dk},inset 1px 1px ${s.hi}">
             <div class="t" style="background:linear-gradient(90deg,${s.title1},${s.title2});color:${s.titleInk}">Active Window</div>
             <div class="b" style="background:${s.window};color:${s.windowInk}">Window text<br><span style="background:${s.sel};color:${s.selInk}">Selected</span></div>
@@ -214,13 +221,15 @@
         const row = el('<div class="dp-row"></div>');
         if (tab === 'Theme Packs') {
           const cur = Object.keys(PACKS).find(k => PACKS[k].scheme === draft.scheme && PACKS[k].wallpaper === draft.wallpaper);
-          row.appendChild(list(Object.keys(PACKS), cur, n => { draft = { scheme: PACKS[n].scheme, wallpaper: PACKS[n].wallpaper }; render(); }));
+          row.appendChild(list(Object.keys(PACKS), cur, n => { draft = { ...draft, scheme: PACKS[n].scheme, wallpaper: PACKS[n].wallpaper }; render(); }));
           page.appendChild(row);
           const bl = el('<p class="dp-blurb"></p>'); bl.textContent = cur ? PACKS[cur].blurb : 'Custom: your own mix of wallpaper and color scheme.'; page.appendChild(bl);
         } else if (tab === 'Background') {
           const lab = el('<div>Wallpaper:</div>'); page.appendChild(lab);
-          row.appendChild(list(Object.keys(WALLPAPERS), draft.wallpaper, n => { draft.wallpaper = n; render(); }));
+          row.appendChild(list(wallpaperNames(), draft.wallpaper, n => { draft.wallpaper = n; render(); }));
           page.appendChild(row);
+        } else if (tab === 'Screen Saver') {
+          renderSaver(); return;
         } else {
           const lab = el('<label class="dp-row">Scheme: <select class="field" id="dp-scheme"></select></label>');
           const sel = lab.querySelector('select');
@@ -229,11 +238,43 @@
           page.appendChild(lab);
         }
       }
-      function commit() { theme = { ...draft }; store.set('theme', theme); applyTheme(theme); Arcade.beep(660, .08, 'square', .03); }
+      let saverRaf = 0;
+      function renderSaver() {
+        const SS = window.Screensavers95;
+        page.innerHTML = `<div class="dp-monitor"><div class="dp-screen" style="--pv-desk:#000"><canvas width="164" height="116" style="width:100%;height:100%;display:block"></canvas></div></div>`;
+        const g = page.querySelector('canvas').getContext('2d');
+        const names = SS ? SS.names : ['(None)'];
+        const box = el(`<fieldset class="groupbox"><legend>Screen Saver</legend>
+          <div class="dp-row"><select class="field" id="dp-saver"></select><button class="btn" data-s="settings">Settings…</button><button class="btn" data-s="preview">Preview</button></div>
+          <div class="dp-row" style="margin-top:8px"><label><input type="checkbox" id="dp-pass"> Password protected</label><button class="btn" data-s="pw">Change…</button>
+          <label style="margin-left:auto">Wait: <input class="field" id="dp-wait" type="number" min="0" max="60" style="width:52px"> minutes</label></div></fieldset>`);
+        page.appendChild(box);
+        const sel = box.querySelector('#dp-saver'), wait = box.querySelector('#dp-wait'), pass = box.querySelector('#dp-pass');
+        names.forEach(n => { const o = document.createElement('option'); o.textContent = n; sel.appendChild(o); });
+        sel.value = draft.saver; wait.value = draft.wait; pass.checked = !!draft.password;
+        sel.onchange = () => { draft.saver = sel.value; };
+        wait.onchange = () => { draft.wait = Math.max(0, Math.min(60, +wait.value || 0)); };
+        pass.onchange = async () => { if (pass.checked && !draft.password) { const pw = await Arcade.dialog({ title: 'Change Password', text: 'New password:', input: '', buttons: ['OK', 'Cancel'] }); if (pw) draft.password = pw; else pass.checked = false; } else if (!pass.checked) draft.password = ''; };
+        box.querySelector('[data-s="pw"]').onclick = async () => { const pw = await Arcade.dialog({ title: 'Change Password', text: 'New password:', input: '', buttons: ['OK', 'Cancel'] }); if (pw) { draft.password = pw; pass.checked = true; } };
+        box.querySelector('[data-s="settings"]').onclick = () => SS && SS.settings && SS.settings(draft.saver);
+        box.querySelector('[data-s="preview"]').onclick = () => SS && SS.start && SS.start(draft.saver);
+        const t0 = performance.now();
+        cancelAnimationFrame(saverRaf);
+        const loop = now => {
+          if (tab !== 'Screen Saver' || !ctx.isVisible() || !g.canvas.isConnected) return;
+          g.fillStyle = '#000'; g.fillRect(0, 0, 164, 116);
+          if (SS && draft.saver !== '(None)') { try { SS.drawPreview(draft.saver, g, 164, 116, (now - t0) / 1000); } catch (e) { console.error(e); } }
+          saverRaf = requestAnimationFrame(loop);
+        };
+        saverRaf = requestAnimationFrame(loop);
+      }
+      function commit() {
+        theme = { scheme: draft.scheme, wallpaper: draft.wallpaper };
+        store.set('screensaver.name', draft.saver); store.set('screensaver.wait', draft.wait); store.set('screensaver.password', draft.password || ''); store.set('theme', theme); applyTheme(theme); Arcade.beep(660, .08, 'square', .03); }
       ctx.body.querySelector('[data-a="ok"]').onclick = () => { commit(); ctx.close(); };
       ctx.body.querySelector('[data-a="apply"]').onclick = commit;
       ctx.body.querySelector('[data-a="cancel"]').onclick = () => ctx.close();
-      ctx.on('open', () => { draft = { ...theme }; render(); });
+      ctx.on('open', () => { draft = { ...theme, ...saverDraft() }; render(); });
       render();
     }
   });

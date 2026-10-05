@@ -189,11 +189,11 @@
     error: '<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges"><circle cx="8" cy="8" r="7" fill="#e01b1b" stroke="#600" stroke-width=".6"/><path d="M5 5 11 11M11 5 5 11" stroke="#fff" stroke-width="2"/></svg>',
     trophy: '<svg width="32" height="32" viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="4" y="2" width="8" height="6" fill="#ffd23f"/><rect x="2" y="3" width="2" height="3" fill="#e0a500"/><rect x="12" y="3" width="2" height="3" fill="#e0a500"/><rect x="6" y="8" width="4" height="2" fill="#e0a500"/><rect x="7" y="10" width="2" height="2" fill="#e0a500"/><rect x="4" y="12" width="8" height="2" fill="#7a4a12"/></svg>'
   };
-  function dialog({ title = 'Arcade 95', text = '', icon = 'info', buttons = ['OK'], input = null }) {
+  function dialog({ title = 'Arcade 95', text = '', icon = 'info', buttons = ['OK'], input = null, maxlength = 24 }) {
     return new Promise(resolve => {
       const veil = el(`<div class="modal-veil"><div class="win msgbox bevel-out active">
         <div class="titlebar"><span class="ttl"><span></span></span><div class="tb-btns"><button data-act="close" aria-label="Close">×</button></div></div>
-        <div class="content">${ICONS[icon] || ''}<div style="flex:1;min-width:0"><p></p>${input != null ? '<input class="field" maxlength="24">' : ''}</div></div>
+        <div class="content">${ICONS[icon] || ''}<div style="flex:1;min-width:0"><p></p>${input != null ? `<input class="field" maxlength="${+maxlength || 24}">` : ''}</div></div>
         <div class="actions"></div></div></div>`);
       veil.querySelector('.ttl span').textContent = title;
       veil.querySelector('p').textContent = text;
@@ -268,7 +268,7 @@
         const sm = el('<div class="submenu bevel-out"><ul></ul></div>');
         order.filter(id => apps[id].folder === f).forEach(id => {
           const it = el(`<li><button>${apps[id].icon || ''}<span></span></button></li>`);
-          it.querySelector('span').textContent = apps[id].title;
+          it.querySelector('span').textContent = apps[id].label || apps[id].title;
           it.firstChild.onclick = () => open(id);
           sm.firstChild.appendChild(it);
         });
@@ -283,21 +283,87 @@
     });
     order.filter(id => !apps[id].folder && apps[id].start).forEach(id => {
       const li = el(`<li><button>${apps[id].icon || ''}<span></span></button></li>`);
-      li.querySelector('span').textContent = apps[id].title;
+      li.querySelector('span').textContent = apps[id].label || apps[id].title;
       li.firstChild.onclick = () => open(id);
       li.firstChild.addEventListener('pointerenter', closeSub);
       ul.appendChild(li);
     });
     ul.appendChild(el('<li><hr></li>'));
     const sd = el('<li><button><svg viewBox="0 0 16 16" shape-rendering="crispEdges"><rect x="2" y="3" width="12" height="9" fill="#333"/><rect x="3" y="4" width="10" height="7" fill="#0b7a78"/><rect x="5" y="12" width="6" height="2" fill="#777"/></svg><span>Shut Down…</span></button></li>');
-    sd.firstChild.onclick = () => { closeStart(); order.forEach(id => { const c = apps[id].ctx; if (c && active === c.win) blurAll(); }); $('#shutdown').hidden = false; };
+    sd.firstChild.onclick = () => { closeStart(); if (hooks.shutdown) hooks.shutdown(); else safeToTurnOff(); };
     sd.firstChild.addEventListener('pointerenter', closeSub);
     ul.appendChild(sd);
   }
   $('#shutdown').onclick = () => { $('#shutdown').hidden = true; };
+  const hooks = {};
+  function safeToTurnOff() { blurAll(); $('#shutdown').hidden = false; }
+  const openWindows = () => order.filter(id => apps[id].ctx && !apps[id].ctx.win.hidden).map(id => ({ id, title: apps[id].ctx.title(), ctx: apps[id].ctx }));
 
   function tick() { $('#clock').textContent = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); }
   tick(); setInterval(tick, 15000);
+
+  /* ---------- Flip 3D ---------- */
+  let flip = null;
+  function flipWindows() { return order.map(id => apps[id].ctx).filter(c => c && !c.win.hidden).sort((a, b) => (+b.win.style.zIndex || 0) - (+a.win.style.zIndex || 0)); }
+  function layoutFlip() {
+    const dw = desktop.clientWidth, dh = desktop.clientHeight, narrow = dw < 700;
+    flip.stack.forEach((c, i) => {
+      const w = c.win, cx = w.offsetLeft + w.offsetWidth / 2, cy = w.offsetTop + w.offsetHeight / 2;
+      const scale = Math.min(1, (dw * (narrow ? .78 : .44)) / w.offsetWidth, (dh * .52) / w.offsetHeight);
+      const tx = dw * (narrow ? .5 : .36) - cx + i * (narrow ? 16 : 120), ty = dh * .54 - cy - i * (narrow ? 24 : 34);
+      w.style.transform = `translate3d(${tx}px, ${ty}px, ${-i * 170}px) rotateY(${narrow ? -18 : -30}deg) scale(${scale})`;
+      w.style.zIndex = 1000 - i; w.style.opacity = String(Math.max(.25, 1 - i * .12));
+      w.style.filter = i ? `brightness(${Math.max(.55, 1 - i * .1)})` : 'none';
+      w.classList.toggle('flip-front', i === 0);
+    });
+  }
+  function enterFlip() {
+    if (flip) return;
+    const stack = flipWindows(); if (!stack.length) { beep(220, .12, 'square', .03); return; }
+    closeStart(); closeMenus(); hideHover();
+    const prev = stack.map(c => ({ c, z: c.win.style.zIndex, min: c.win.dataset.min }));
+    stack.forEach(c => { c.win.classList.add('flip-anim'); if (c.win.dataset.min) c.win.style.visibility = ''; });
+    if (active) { const c = ctxOf(active); if (c) c.emit('blur'); }
+    const veil = el('<div class="flip-veil"></div>'), hint = el('<div class="flip-hint">Scroll or ← → to flip · click a window or Enter to open · Esc to cancel</div>');
+    desktop.appendChild(veil); desktop.appendChild(hint);
+    flip = { stack, prev, veil, hint };
+    requestAnimationFrame(() => { desktop.classList.add('flip3d'); layoutFlip(); });
+    veil.addEventListener('click', () => exitFlip(null));
+    beep(520, .08, 'triangle', .04, 300);
+  }
+  function rotateFlip(dir) {
+    if (!flip || flip.stack.length < 2) return;
+    if (dir > 0) flip.stack.push(flip.stack.shift()); else flip.stack.unshift(flip.stack.pop());
+    layoutFlip(); beep(dir > 0 ? 700 : 600, .04, 'triangle', .025);
+  }
+  function exitFlip(pick) {
+    if (!flip) return;
+    const f = flip; flip = null;
+    desktop.classList.remove('flip3d');
+    f.stack.forEach(c => { c.win.style.transform = ''; c.win.style.opacity = ''; c.win.style.filter = ''; c.win.classList.remove('flip-front'); });
+    f.prev.forEach(p => { p.c.win.style.zIndex = p.z; if (p.min && p.c !== pick) p.c.win.style.visibility = 'hidden'; });
+    f.veil.remove(); f.hint.remove();
+    setTimeout(() => f.stack.forEach(c => c.win.classList.remove('flip-anim')), 550);
+    if (pick) open(pick.id); else if (active) { const c = ctxOf(active); if (c) focusWin(c); }
+  }
+  $('#b-flip').onclick = e => { e.stopPropagation(); flip ? exitFlip(flip.stack[0]) : enterFlip(); };
+  desktop.addEventListener('click', e => {
+    if (!flip) return; const w = e.target.closest('.win'); if (!w) return;
+    e.stopPropagation(); e.preventDefault();
+    const c = flip.stack.find(c => c.win === w);
+    if (c === flip.stack[0]) exitFlip(c); else { while (flip.stack[0] !== c) flip.stack.push(flip.stack.shift()); layoutFlip(); }
+  }, true);
+  desktop.addEventListener('pointerdown', e => { if (flip && e.target.closest('.win')) { e.stopPropagation(); e.preventDefault(); } }, true);
+  desktop.addEventListener('wheel', e => { if (!flip) return; e.preventDefault(); rotateFlip(e.deltaY > 0 || e.deltaX > 0 ? 1 : -1); }, { passive: false });
+  addEventListener('keydown', e => {
+    if (e.ctrlKey && e.shiftKey && (e.key === 'F' || e.key === 'f')) { e.preventDefault(); e.stopImmediatePropagation(); flip ? exitFlip(flip.stack[0]) : enterFlip(); return; }
+    if (!flip) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (e.key === 'Escape') exitFlip(null);
+    else if (e.key === 'Enter' || e.key === ' ') exitFlip(flip.stack[0]);
+    else if (['ArrowRight', 'ArrowDown', 'Tab'].includes(e.key)) rotateFlip(1);
+    else if (['ArrowLeft', 'ArrowUp'].includes(e.key)) rotateFlip(-1);
+  }, true);
 
   function boot(firstOpen) {
     order.filter(id => apps[id].desktop).forEach(id => iconsEl.appendChild(iconButton(apps[id])));
@@ -310,6 +376,9 @@
     app, open, boot, store, beep, audio, css, dialog, esc, el, coarse, iconButton, apps, order,
     isMuted: () => muted, setMuted, onMute: f => muteListeners.add(f),
     scores: { add: s => scoreSections.push(s), list: () => scoreSections },
-    closeAll: () => order.forEach(id => apps[id].ctx && !apps[id].ctx.win.hidden && closeWin(apps[id].ctx))
+    closeAll: () => order.forEach(id => apps[id].ctx && !apps[id].ctx.win.hidden && closeWin(apps[id].ctx)),
+    hooks, safeToTurnOff, openWindows, blurAll, closeStart,
+    activeId: () => (active ? active.id.slice(2) : null),
+    flip3d: () => (flip ? exitFlip(flip.stack[0]) : enterFlip())
   };
 })();

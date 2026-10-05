@@ -32,7 +32,7 @@ body { background: var(--desk); color: var(--ink); font: 12px/1.35 var(--ui); ov
 button, input, select, textarea { font: inherit; color: var(--ink); }
 
 .desktop { position: fixed; inset: 0 0 calc(32px + env(safe-area-inset-bottom, 0px)) 0; overflow: hidden;
-  background: var(--wallpaper), var(--desk); background-size: var(--wallpaper-size, auto); }
+  background: var(--wallpaper), var(--desk); background-size: var(--wallpaper-size, auto); background-repeat: var(--wallpaper-repeat, repeat); background-position: center; }
 .icons { position: absolute; top: 12px; left: 12px; display: grid; grid-auto-flow: column; grid-template-rows: repeat(auto-fill, 78px); gap: 2px 6px; max-height: calc(100% - 24px); }
 .icon { width: 76px; background: none; border: 0; padding: 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: default; color: var(--icon-ink); position: relative; }
 .icon svg { width: 34px; height: 34px; image-rendering: pixelated; filter: drop-shadow(1px 1px 0 rgba(0,0,0,.35)); transition: transform .12s; }
@@ -160,3 +160,15 @@ table.scores { border-collapse: collapse; width: 100%; font-variant-numeric: tab
   .icons { grid-auto-flow: row; grid-template-columns: repeat(auto-fill, 76px); grid-template-rows: none; right: 12px; }
   .hovercard { display: none; }
 }
+
+/* Flip 3D: every open window floats in a tilted 3D stack */
+.desktop.flip3d { perspective: 1600px; perspective-origin: 50% 40%; }
+.flip-veil { position: absolute; inset: 0; z-index: 5; background: radial-gradient(ellipse at 50% 45%, rgba(10,10,40,.35), rgba(0,0,10,.82)); opacity: 0; pointer-events: none; transition: opacity .35s; }
+.desktop.flip3d .flip-veil { opacity: 1; pointer-events: auto; }
+.desktop.flip3d .icons { opacity: .25; transition: opacity .35s; }
+.win.flip-anim { transition: transform .5s cubic-bezier(.2,.8,.2,1), opacity .5s, filter .5s; }
+.desktop.flip3d .win { cursor: pointer; transform-origin: 50% 50%; box-shadow: inset -1px -1px var(--dk), inset 1px 1px var(--hi2), inset -2px -2px var(--lo), inset 2px 2px var(--hi), 0 30px 60px rgba(0,0,0,.55); }
+.desktop.flip3d .win > * { pointer-events: none; }
+.desktop.flip3d .win.flip-front { filter: none; }
+.flip-hint { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 9000; color: #fff; font: 11px var(--pixel); background: rgba(0,0,0,.55); padding: 6px 10px; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+@media (prefers-reduced-motion: reduce) { .win.flip-anim { transition: none; } }
